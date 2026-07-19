@@ -12,3 +12,16 @@ resource "aws_vpc" "this" {
     Name = "rag-platform-${var.environment}"
   }
 }
+
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.this.id
+
+  ingress = []
+  egress  = []
+
+  tags = {
+    Name        = "rag-platform-${var.environment}-default-sg"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
