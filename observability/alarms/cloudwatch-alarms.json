@@ -1,0 +1,26 @@
+{
+  "comment": "Alarm definitions materialized by the observability Terraform module (Phase 7).",
+  "alarms": [
+    {
+      "name": "rag-high-5xx-rate",
+      "metric": "5xxErrorRate",
+      "threshold": 0.05,
+      "period_seconds": 300,
+      "action": "notify-oncall"
+    },
+    {
+      "name": "rag-token-cost-spike",
+      "metric": "EstimatedTokenCostUSD",
+      "threshold": 25,
+      "period_seconds": 3600,
+      "action": "notify-oncall"
+    },
+    {
+      "name": "rag-guardrail-intervention-spike",
+      "metric": "GuardrailInterventions",
+      "threshold": 20,
+      "period_seconds": 900,
+      "action": "notify-security"
+    }
+  ]
+}

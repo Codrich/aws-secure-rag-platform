@@ -1,0 +1,26 @@
+{
+  "comment": "CloudWatch dashboard source (Phase 7). Widgets: request rate, p95 latency, Bedrock input/output tokens and estimated cost, guardrail interventions, retrieval hit rate, 4xx/5xx.",
+  "widgets": [
+    {
+      "type": "metric",
+      "properties": {
+        "title": "Bedrock tokens",
+        "metrics": [
+          ["RAGPlatform", "InputTokens"],
+          ["RAGPlatform", "OutputTokens"]
+        ],
+        "stat": "Sum",
+        "period": 300
+      }
+    },
+    {
+      "type": "metric",
+      "properties": {
+        "title": "Query latency p95 (ms)",
+        "metrics": [["RAGPlatform", "QueryLatencyMs"]],
+        "stat": "p95",
+        "period": 300
+      }
+    }
+  ]
+}

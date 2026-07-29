@@ -2,11 +2,11 @@
 
 > Production-style, security-first Retrieval-Augmented Generation platform on AWS Bedrock — built with Terraform, ECS Fargate, FastAPI, and a DevSecOps pipeline with AI evaluation gates.
 
-**Status: Phase 1 — Core service and infrastructure skeleton.** See [Roadmap](#roadmap).
+**Status: Phase 1 complete; local RAG core (retrieval, citations, ingestion) implemented.** See [Roadmap](#roadmap).
 
 ## Overview
 
-This project implements a secure RAG platform that lets authenticated users query a controlled knowledge base and receive grounded, cited answers from an Amazon Bedrock foundation model — with guardrails, private networking, AI evaluation gates in CI, and governance documentation aligned with the NIST AI RMF and OWASP Top 10 for LLM Applications.
+A secure RAG platform where tenant isolation is enforced during retrieval, AI behavior is regression-tested in CI, failures default to safe behavior, and releases are blocked unless security, quality, and supply-chain gates pass. Built on Amazon Bedrock, FastAPI, pgvector, and Terraform, with governance documentation aligned to the NIST AI RMF and OWASP Top 10 for LLM Applications.
 
 It is a platform-engineering and AI-security project, not a chatbot demo. All data is synthetic. Compliance mappings are alignment exercises, not certifications.
 
@@ -50,8 +50,13 @@ v1 uses PostgreSQL with pgvector as the vector store. It demonstrates the same R
 ```bash
 # Requires Docker and AWS credentials with bedrock:InvokeModel
 cp .env.example .env   # set BEDROCK_MODEL_ID and AWS_REGION
-make dev               # build and run with docker-compose
+make dev               # api + postgres/pgvector via docker-compose
+make db-init           # create extension, table, HNSW index
+make ingest            # embed and load the synthetic corpus
 curl localhost:8000/healthz
+curl -X POST localhost:8000/v1/query \
+  -H 'Content-Type: application/json' \
+  -d '{"question": "What is the document retention period?"}'
 ```
 
 Run checks:
@@ -64,26 +69,37 @@ make test   # pytest
 ## Repository structure
 
 ```
-app/            FastAPI service (api, bedrock client, auth, config, tests)
-infrastructure/ Terraform modules and dev environment
-evaluations/    Golden datasets and AI security test cases (CI gates)
-policies/       Policy-as-code (OPA/Conftest), IAM baselines
-observability/  CloudWatch dashboards and alarms
+app/            FastAPI service: api/routes, rag core, clients, auth, core, models, tests
+infrastructure/ Terraform modules (networking, ecs, rds, ...) and dev environment
+evaluations/    Golden dataset, security cases, offline evaluation tests (CI gates)
+policies/       Policy-as-code (OPA/Conftest), IAM least-privilege baselines
+observability/  CloudWatch dashboard and alarm definitions
 docs/           Architecture, governance, runbooks
+scripts/        DB init, corpus ingestion, evaluation runner
+synthetic-data/ Synthetic document corpus (no real data)
 ```
 
 ## Roadmap
 
-| Phase | Scope | Status |
+| Milestone | Deliverable | Status |
 |---|---|---|
-| 1 | FastAPI + Bedrock invocation, Docker, tests, Terraform skeleton, CI validation, governance docs | In progress |
-| 2 | AWS foundation: VPC, ECS Fargate, RDS pgvector, Cognito, KMS, Secrets Manager | Planned |
-| 3 | Ingestion pipeline: S3 -> SQS -> chunking -> embeddings -> pgvector (DLQ, status tracking) | Planned |
-| 4 | Authenticated RAG API: retrieval, citations, document-level authorization, rate limiting | Planned |
-| 5 | AI security: Bedrock Guardrails, prompt-injection test suite, PII controls | Planned |
-| 6 | DevSecOps: full pipeline with SBOM, Cosign signing, policy gates, eval gates | Planned |
-| 7 | Observability: token/cost dashboards, guardrail intervention metrics, alarms | Planned |
-| 8 | Optional: EKS deployment variant (Helm, ArgoCD), OpenSearch Serverless variant | Future |
+| 1 | Make it work: restructure, packaging, lint/type/test green, one-command local run, cited RAG flow | Done (this branch) |
+| 2 | Make it secure: tenant-aware retrieval, document classification, authorization + misuse-case tests | Partial: fail-closed + misuse tests done; tenancy next |
+| 3 | Make AI behavior measurable: golden dataset, offline eval gates blocking CI, workflow scorecard | Done (offline); model-graded gates at M5 |
+| 4 | Make the release trustworthy: Trivy, Gitleaks, SBOM, Cosign, provenance, evidence bundle | Partial: Checkov + secret scan in CI |
+| 5 | Prove AWS delivery: Terraform foundation, ephemeral ECS deploy, smoke tests, teardown, cost report | Planned |
+| 6 | Operational depth: SQS ingestion with DLQ, OpenTelemetry, red-team findings, demo recording | Planned |
+
+Stretch goals: Bedrock Guardrails integration, Automated Reasoning policy validation.
+Out of scope by decision: Backstage, Kubernetes variant, multi-cloud, SaaS control plane, always-on infrastructure.
+
+## Known limitations
+
+- All data is synthetic; compliance mappings are alignment exercises, not certifications.
+- Offline evaluations are deterministic behavioral checks, not independent model-graded scores (those arrive with the ephemeral deployment).
+- Tenant isolation is designed (ADR 0002) but not yet implemented; retrieval is currently single-tenant.
+- pgvector is chosen for cost and reproducibility, not maximum-scale search.
+- No cloud environment is kept running; AWS deployments are ephemeral by design.
 
 ## Governance documentation
 
@@ -91,6 +107,9 @@ docs/           Architecture, governance, runbooks
 - [NIST AI RMF mapping](docs/governance/NIST_AI_RMF_MAPPING.md)
 - [OWASP LLM Top 10 mapping](docs/governance/OWASP_LLM_TOP_10_MAPPING.md)
 - [AI incident response runbook](docs/runbooks/AI_INCIDENT_RESPONSE_RUNBOOK.md)
+- [Failure-mode contract](docs/security/FAILURE_MODES.md)
+- [Control traceability matrix](docs/security/CONTROL_TRACEABILITY.md)
+- [Architecture decision records](docs/adr/)
 - [Security policy](SECURITY.md)
 
 ## License
