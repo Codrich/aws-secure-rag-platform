@@ -10,6 +10,27 @@ A secure RAG platform where tenant isolation is enforced during retrieval, AI be
 
 It is a platform-engineering and AI-security project, not a chatbot demo. All data is synthetic. Compliance mappings are alignment exercises, not certifications.
 
+## Verified Milestone 1 Evidence
+
+Milestone 1 establishes the verified secure RAG baseline:
+
+- Python 3.11 CI validation
+- Ruff and MyPy enforcement
+- 27 passing application and evaluation tests
+- 6/6 deterministic offline AI evaluation gates
+- IaC, secret-scanning, and Terraform workflow checks
+- working FastAPI health endpoint
+
+### CI and Security Checks
+
+![Milestone 1 CI checks](docs/images/milestone-1-ci-checks.png)
+
+### Offline AI Evaluation Gate
+
+![Offline AI evaluation gate](docs/images/offline-evaluation-gate.png)
+
+The offline evaluation gates verify no-context refusal, prompt-injection confinement, and citation integrity. Model-graded quality scores and latency thresholds remain deferred until live AWS deployment testing.
+
 ## Architecture (target)
 
 ```
