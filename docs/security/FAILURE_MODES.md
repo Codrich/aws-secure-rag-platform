@@ -15,6 +15,7 @@ rows marked Planned land with the milestone shown and must arrive with tests.
 | Caller asserts its own tenant in the payload | 422; identity always resolved server-side | Implemented | `app/tests/test_tenant_isolation.py` |
 | Tenant unset on a database connection | RLS matches no rows (fail closed) | Implemented | `app/tests/test_rls_integration.py` (CI) |
 | Cross-tenant write attempt | Rejected by RLS `WITH CHECK` | Implemented | `app/tests/test_rls_integration.py` (CI) |
+| Role absent from a document's `allowed_roles` | Chunk not retrieved; no signal it exists | Implemented | `app/tests/test_tenant_isolation.py`, `app/tests/test_rls_integration.py` (CI) |
 | Ingestion above the caller's classification | 403 | Implemented | `app/tests/test_tenant_isolation.py` |
 | Unknown classification value | 422 from schema validation | Implemented | request model enum |
 | Duplicate ingestion event | Idempotent processing | Planned (M6) | with SQS pipeline |

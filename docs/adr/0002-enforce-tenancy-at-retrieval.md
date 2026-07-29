@@ -11,9 +11,13 @@ below the model.
 Tenant and document-classification filters are applied in the vector query
 itself. Two independent layers enforce this:
 
-1. **Application layer** - `VectorStore.search` filters on `tenant_id` and
-   the caller's allowed classifications inside the SQL `WHERE` clause, so
-   unauthorized chunks are never fetched into application memory.
+1. **Application layer** - `VectorStore.search` filters on `tenant_id`, the
+   caller's allowed classifications, and the document's `allowed_roles` ACL
+   inside the SQL `WHERE` clause, so unauthorized chunks are never fetched
+   into application memory. Classification is the coarse sensitivity tier a
+   role may read; `allowed_roles` is an optional per-document ACL that
+   narrows access further (empty means classification alone governs). A
+   caller must satisfy both.
 2. **Database layer** - PostgreSQL row-level security on `document_chunks`,
    declared `FORCE` so it applies to the table owner as well. Each
    connection sets `app.tenant_id` through `set_config()`; the policy
@@ -36,6 +40,8 @@ smuggled `tenant_id` is rejected with 422 rather than silently ignored.
   future code would silently cross tenants.
 
 ## Consequences
+Chunks carry `tenant_id`, `document_id`, `classification`, `allowed_roles`
+and `source`; `document_id` is the replacement unit for re-ingestion.
 Every retrieval requires tenant context; missing context returns 401 and an
 unknown tenant returns 403. Ingestion is scoped to the caller's tenant and
 a caller cannot ingest at a classification its role cannot read. RLS

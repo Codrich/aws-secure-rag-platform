@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.auth.permissions import Classification
+from app.auth.permissions import Classification, Role
 
 
 class QueryRequest(BaseModel):
@@ -32,3 +32,6 @@ class IngestRequest(BaseModel):
 
     source: str = Field(min_length=1, max_length=512)
     classification: Classification
+    document_id: str | None = Field(default=None, max_length=512)
+    # Optional per-document ACL. Empty means classification alone governs access.
+    allowed_roles: list[Role] = Field(default_factory=list)

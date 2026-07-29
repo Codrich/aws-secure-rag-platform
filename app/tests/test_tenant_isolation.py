@@ -174,5 +174,70 @@ def test_search_sql_filters_by_tenant_and_classification() -> None:
 
     search_sql, search_params = executed[1]
     assert "WHERE tenant_id = %s AND classification = ANY(%s)" in search_sql
+    assert "cardinality(allowed_roles) = 0 OR %s = ANY(allowed_roles)" in search_sql
     assert "tenant-a" in search_params
     assert sorted(search_params[2]) == ["internal", "public"]
+    assert search_params[3] == "reader"
+
+
+def test_ingest_passes_document_acl_to_store() -> None:
+    from app.api.dependencies import get_ingestion_service
+
+    service = MagicMock()
+    service.ingest_file.return_value = 2
+    app.dependency_overrides[get_ingestion_service] = lambda: service
+    try:
+        response = client.post(
+            "/v1/documents/ingest",
+            json={
+                "source": "employee_security_policy.md",
+                "classification": "confidential",
+                "document_id": "doc-42",
+                "allowed_roles": ["admin"],
+            },
+            headers={"X-Tenant-Id": "tenant-a", "X-Tenant-Role": "ingestor"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_ingestion_service)
+    assert response.status_code == 200
+    kwargs = service.ingest_file.call_args.kwargs
+    assert kwargs["document_id"] == "doc-42"
+    assert kwargs["allowed_roles"] == ["admin"]
+
+
+def test_prompt_context_contains_only_authorized_chunks() -> None:
+    """Whatever retrieval returns is exactly what reaches prompt construction.
+
+    Retrieval is the filter: the service performs no post-hoc filtering, so a
+    chunk that was never retrieved can never appear in the model prompt. This
+    asserts the service adds nothing to the context beyond the store's output.
+    Cross-tenant filtering itself is proven against a real database in
+    test_rls_integration.py.
+    """
+    from app.rag.prompting import build_user_prompt
+    from app.rag.retrieval import RetrievedChunk
+
+    authorized = RetrievedChunk(
+        source="a.md",
+        chunk_index=0,
+        content="TENANT-A-ONLY-MARKER",
+        score=0.95,
+        document_id="doc-a",
+        tenant_id="tenant-a",
+    )
+    embeddings = MagicMock()
+    embeddings.embed.return_value = [0.1]
+    store = MagicMock()
+    store.search.return_value = [authorized]
+    bedrock = make_bedrock()
+    RagService(bedrock=bedrock, embeddings=embeddings, store=store).query(
+        "what is the policy?",
+        context=TenantContext(
+            tenant_id="tenant-a",
+            role=Role.READER,
+            allowed_classifications=allowed_classifications(Role.READER),
+        ),
+    )
+    sent_prompt = bedrock._client.converse.call_args.kwargs["messages"][0]["content"][0]["text"]
+    assert "TENANT-A-ONLY-MARKER" in sent_prompt
+    assert sent_prompt == build_user_prompt("what is the policy?", [authorized])

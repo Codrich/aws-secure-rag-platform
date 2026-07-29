@@ -22,7 +22,13 @@ class IngestionService:
         self._settings = get_settings()
 
     def ingest_text(
-        self, tenant_id: str, source: str, classification: Classification, text: str
+        self,
+        tenant_id: str,
+        source: str,
+        classification: Classification,
+        text: str,
+        document_id: str | None = None,
+        allowed_roles: list[str] | None = None,
     ) -> int:
         chunks = chunk_text(
             text,
@@ -32,7 +38,14 @@ class IngestionService:
         rows: list[tuple[int, str, list[float]]] = []
         for chunk in chunks:
             rows.append((chunk.index, chunk.text, self._embeddings.embed(chunk.text)))
-        count = self._store.upsert_chunks(tenant_id, source, classification, rows)
+        count = self._store.upsert_chunks(
+            tenant_id,
+            source,
+            classification,
+            rows,
+            document_id=document_id,
+            allowed_roles=allowed_roles,
+        )
         logger.info(
             "document_ingested",
             tenant_id=tenant_id,
@@ -48,10 +61,14 @@ class IngestionService:
         tenant_id: str,
         classification: Classification,
         source: str | None = None,
+        document_id: str | None = None,
+        allowed_roles: list[str] | None = None,
     ) -> int:
         return self.ingest_text(
             tenant_id=tenant_id,
             source=source or path.name,
             classification=classification,
             text=path.read_text(encoding="utf-8"),
+            document_id=document_id,
+            allowed_roles=allowed_roles,
         )

@@ -2,9 +2,9 @@
 
 Sources resolve against a fixed synthetic corpus directory and path
 traversal is rejected. Documents are written into the caller's tenant with
-an explicit classification; a caller may not ingest at a classification its
-role cannot itself read. Milestone 6 replaces this with the S3 -> SQS
-pipeline.
+an explicit classification and an optional per-document role ACL; a caller
+may not ingest at a classification its role cannot itself read. Milestone 6
+replaces this with the S3 -> SQS pipeline.
 """
 from pathlib import Path
 from typing import Annotated
@@ -43,6 +43,11 @@ def ingest(
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Unknown document")
     count = service.ingest_file(
-        path, tenant_id=context.tenant_id, classification=body.classification, source=body.source
+        path,
+        tenant_id=context.tenant_id,
+        classification=body.classification,
+        source=body.source,
+        document_id=body.document_id,
+        allowed_roles=[r.value for r in body.allowed_roles],
     )
     return IngestResponse(source=body.source, chunks_ingested=count)

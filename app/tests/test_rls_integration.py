@@ -89,3 +89,47 @@ def test_rls_rejects_cross_tenant_write(store: object) -> None:
                 "VALUES (%s, %s, %s, %s, %s, %s::vector)",
                 ("tenant-b", "evil.md", 0, "injected", "internal", vec([0, 1.0, 0, 0])),
             )
+
+
+def test_identical_similarity_across_tenants_returns_only_own_rows(store: object) -> None:
+    """Both tenants hold an identical vector; tenant A must still see only its own."""
+    from app.auth.permissions import Role, allowed_classifications
+    from app.auth.tenancy import TenantContext
+
+    ctx = TenantContext(
+        tenant_id="tenant-a",
+        role=Role.READER,
+        allowed_classifications=allowed_classifications(Role.READER),
+    )
+    results = store.search([1.0, 0, 0, 0], context=ctx, top_k=10)  # type: ignore[attr-defined]
+    assert results
+    assert all(r.tenant_id == "tenant-a" for r in results)
+    assert not any("tenant B" in r.content for r in results)
+
+
+def test_document_acl_excludes_roles_not_listed(store: object) -> None:
+    from app.auth.permissions import Classification, Role, allowed_classifications
+    from app.auth.tenancy import TenantContext
+
+    store.upsert_chunks(  # type: ignore[attr-defined]
+        "tenant-a",
+        "admin-only.md",
+        Classification.INTERNAL,
+        [(0, "admin eyes only", [1.0, 0, 0, 0])],
+        document_id="doc-admin",
+        allowed_roles=["admin"],
+    )
+    reader_ctx = TenantContext(
+        tenant_id="tenant-a",
+        role=Role.READER,
+        allowed_classifications=allowed_classifications(Role.READER),
+    )
+    admin_ctx = TenantContext(
+        tenant_id="tenant-a",
+        role=Role.ADMIN,
+        allowed_classifications=allowed_classifications(Role.ADMIN),
+    )
+    reader_results = store.search([1.0, 0, 0, 0], context=reader_ctx, top_k=10)  # type: ignore[attr-defined]
+    admin_results = store.search([1.0, 0, 0, 0], context=admin_ctx, top_k=10)  # type: ignore[attr-defined]
+    assert not any(r.document_id == "doc-admin" for r in reader_results)
+    assert any(r.document_id == "doc-admin" for r in admin_results)

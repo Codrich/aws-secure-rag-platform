@@ -12,6 +12,8 @@ planned controls live in the threat model and FAILURE_MODES.md, not here.
 | Over-broad data access by role | Classification filter derived from role, applied in SQL | `app/auth/permissions.py`, `app/rag/retrieval.py` | `app/tests/test_tenant_isolation.py` | CI run |
 | Privilege escalation via direct model access | `/v1/generate` restricted to admin role | `app/api/routes/query.py` | `app/tests/test_tenant_isolation.py` | CI run |
 | Write-up of unreadable data | Ingestion classification capped at the caller's read scope | `app/api/routes/documents.py` | `app/tests/test_tenant_isolation.py` | CI run |
+| Over-broad access within a tenant | Per-document `allowed_roles` ACL applied in the retrieval query | `app/rag/retrieval.py` | `app/tests/test_tenant_isolation.py`, `app/tests/test_rls_integration.py` | CI run |
+| Unauthorized content reaching the model prompt | Filtering happens at retrieval; the service adds nothing to context | `app/rag/service.py` | `app/tests/test_tenant_isolation.py` | CI run |
 | Prompt injection (question or poisoned chunk) | Hardened system prompt; retrieved content confined to user role | `app/rag/prompting.py` | `evaluations/tests/test_prompt_injection.py` | CI run |
 | Ungrounded answers / hallucination | No-context deterministic refusal without model call | `app/rag/service.py` | `evaluations/tests/test_groundedness.py` | CI run + scorecard |
 | Fabricated citations | Citations derived only from retrieved chunks with real scores | `app/rag/service.py` | `evaluations/tests/test_response_quality.py` | CI run |

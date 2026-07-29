@@ -118,7 +118,8 @@ Out of scope by decision: Backstage, Kubernetes variant, multi-cloud, SaaS contr
 
 - All data is synthetic; compliance mappings are alignment exercises, not certifications.
 - Offline evaluations are deterministic behavioral checks, not independent model-graded scores (those arrive with the ephemeral deployment).
-- Tenant isolation is enforced at the retrieval query and by PostgreSQL row-level security, but caller identity currently comes from validated request headers; verified Cognito JWT claims replace that resolver in Milestone 4 without changing call sites.
+- Tenant isolation is enforced at the retrieval query (tenant, classification and per-document role ACL) and independently by PostgreSQL row-level security. Caller identity currently comes from validated request headers; verified Cognito JWT claims replace that resolver in Milestone 4 without changing call sites.
+- Row-level security is verified only in the CI `integration-tests` job, which runs a real pgvector container; those tests skip on machines without `TEST_DATABASE_URL`.
 - pgvector is chosen for cost and reproducibility, not maximum-scale search.
 - No cloud environment is kept running; AWS deployments are ephemeral by design.
 
