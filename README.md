@@ -105,7 +105,7 @@ synthetic-data/ Synthetic document corpus (no real data)
 | Milestone | Deliverable | Status |
 |---|---|---|
 | 1 | Make it work: restructure, packaging, lint/type/test green, one-command local run, cited RAG flow | Done (this branch) |
-| 2 | Make it secure: tenant-aware retrieval, document classification, authorization + misuse-case tests | Partial: fail-closed + misuse tests done; tenancy next |
+| 2 | Make it secure: tenant-aware retrieval, document classification, authorization + misuse-case tests | Done (identity resolver is a dev header shim until Cognito lands in M4) |
 | 3 | Make AI behavior measurable: golden dataset, offline eval gates blocking CI, workflow scorecard | Done (offline); model-graded gates at M5 |
 | 4 | Make the release trustworthy: Trivy, Gitleaks, SBOM, Cosign, provenance, evidence bundle | Partial: Checkov + secret scan in CI |
 | 5 | Prove AWS delivery: Terraform foundation, ephemeral ECS deploy, smoke tests, teardown, cost report | Planned |
@@ -118,7 +118,7 @@ Out of scope by decision: Backstage, Kubernetes variant, multi-cloud, SaaS contr
 
 - All data is synthetic; compliance mappings are alignment exercises, not certifications.
 - Offline evaluations are deterministic behavioral checks, not independent model-graded scores (those arrive with the ephemeral deployment).
-- Tenant isolation is designed (ADR 0002) but not yet implemented; retrieval is currently single-tenant.
+- Tenant isolation is enforced at the retrieval query and by PostgreSQL row-level security, but caller identity currently comes from validated request headers; verified Cognito JWT claims replace that resolver in Milestone 4 without changing call sites.
 - pgvector is chosen for cost and reproducibility, not maximum-scale search.
 - No cloud environment is kept running; AWS deployments are ephemeral by design.
 

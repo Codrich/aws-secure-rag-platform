@@ -1,4 +1,5 @@
-"""RAG orchestration: retrieve -> ground -> generate -> cite."""
+"""RAG orchestration: authorize -> retrieve -> ground -> generate -> cite."""
+from app.auth.tenancy import TenantContext
 from app.clients.bedrock import BedrockService
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -27,12 +28,16 @@ class RagService:
         self._store = store
         self._settings = get_settings()
 
-    def query(self, question: str, top_k: int | None = None) -> QueryResponse:
+    def query(
+        self, question: str, context: TenantContext, top_k: int | None = None
+    ) -> QueryResponse:
         embedding = self._embeddings.embed(question)
-        chunks = self._store.search(embedding, top_k=top_k)
+        chunks = self._store.search(embedding, context=context, top_k=top_k)
 
         if not chunks:
-            logger.info("query_no_context", retrieved=0)
+            # Authorized-but-empty and unauthorized are indistinguishable to the
+            # caller: no model call, and no signal about other tenants' content.
+            logger.info("query_no_context", tenant_id=context.tenant_id, retrieved=0)
             return QueryResponse(
                 request_id="",
                 answer=NO_CONTEXT_ANSWER,
@@ -49,7 +54,13 @@ class RagService:
             Citation(source=c.source, chunk_index=c.chunk_index, score=round(c.score, 4))
             for c in chunks
         ]
-        logger.info("query_answered", retrieved=len(chunks), request_id=result.request_id)
+        logger.info(
+            "query_answered",
+            tenant_id=context.tenant_id,
+            role=context.role.value,
+            retrieved=len(chunks),
+            request_id=result.request_id,
+        )
         return QueryResponse(
             request_id=result.request_id,
             answer=result.text,

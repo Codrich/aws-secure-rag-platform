@@ -7,6 +7,8 @@ from unittest.mock import MagicMock
 
 from app.clients.bedrock import BedrockService
 from app.rag.retrieval import RetrievedChunk
+from app.auth.permissions import Role, allowed_classifications
+from app.auth.tenancy import TenantContext
 from app.rag.service import RagService
 
 
@@ -26,6 +28,10 @@ def test_citations_match_retrieved_chunks() -> None:
     store.search.return_value = chunks
     result = RagService(
         bedrock=BedrockService(client=mock), embeddings=embeddings, store=store
-    ).query("q")
+    ).query("q", context=TenantContext(
+        tenant_id="tenant-a",
+        role=Role.READER,
+        allowed_classifications=allowed_classifications(Role.READER),
+    ))
     assert [c.source for c in result.citations] == ["a.md", "b.md"]
     assert all(0.0 <= c.score <= 1.0 for c in result.citations)

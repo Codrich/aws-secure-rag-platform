@@ -5,6 +5,8 @@ from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies import get_bedrock_service, get_rag_service
+from app.auth.permissions import Action
+from app.auth.tenancy import TenantContext, require
 from app.clients.bedrock import BedrockService, PromptTooLargeError
 from app.core.security import sanitize_text
 from app.models.requests import GenerateRequest, QueryRequest
@@ -24,10 +26,11 @@ THROTTLE_CODES = {
 def query(
     body: QueryRequest,
     service: Annotated[RagService, Depends(get_rag_service)],
+    context: Annotated[TenantContext, require(Action.QUERY)],
 ) -> QueryResponse:
     question = sanitize_text(body.question)
     try:
-        return service.query(question, top_k=body.top_k)
+        return service.query(question, context=context, top_k=body.top_k)
     except PromptTooLargeError as exc:
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except psycopg.OperationalError as exc:
@@ -51,6 +54,7 @@ def query(
 def generate(
     body: GenerateRequest,
     service: Annotated[BedrockService, Depends(get_bedrock_service)],
+    context: Annotated[TenantContext, require(Action.GENERATE)],
 ) -> GenerateResponse:
     try:
         result = service.invoke(sanitize_text(body.prompt))

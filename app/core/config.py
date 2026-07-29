@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     chunk_max_chars: int = 1200
     chunk_overlap_chars: int = 150
 
+    # Tenancy (dev resolver only; replaced by verified Cognito claims in M4)
+    tenant_allowlist: str = "tenant-a,tenant-b"
+    default_tenant_role: str = "reader"
+
+    @property
+    def tenant_allowlist_values(self) -> frozenset[str]:
+        return frozenset(t.strip() for t in self.tenant_allowlist.split(",") if t.strip())
+
 
 @lru_cache
 def get_settings() -> Settings:
