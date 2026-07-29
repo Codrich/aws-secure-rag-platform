@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeConfiguredModelOnly",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": [
+        "arn:aws:bedrock:${aws_region}::foundation-model/${bedrock_model_id}",
+        "arn:aws:bedrock:${aws_region}::foundation-model/${embedding_model_id}"
+      ]
+    }
+  ]
+}

@@ -12,3 +12,12 @@ test:
 
 tf-validate:
 	cd infrastructure/environments/dev && terraform init -backend=false && terraform validate
+
+db-init:
+	python scripts/initialize_database.py
+
+ingest:
+	python scripts/ingest_documents.py
+
+evals:
+	python scripts/run_evaluations.py
