@@ -12,6 +12,7 @@ from app.api.dependencies import get_rag_service
 from app.clients.bedrock import BedrockService
 from app.main import app
 from app.rag.service import RagService
+from app.tests.conftest import TENANT_A_HEADERS
 
 client = TestClient(app)
 
@@ -50,7 +51,9 @@ def test_vector_store_down_fails_closed_without_model_call() -> None:
     service, bedrock_client = make_service(store_error=psycopg.OperationalError("db down"))
     app.dependency_overrides[get_rag_service] = lambda: service
     try:
-        response = client.post("/v1/query", json={"question": "anything"})
+        response = client.post(
+            "/v1/query", json={"question": "anything"}, headers=TENANT_A_HEADERS
+        )
     finally:
         app.dependency_overrides.pop(get_rag_service)
     assert response.status_code == 503
@@ -65,7 +68,9 @@ def test_bedrock_throttling_returns_controlled_503() -> None:
     service, _ = make_service(bedrock_error=error)
     app.dependency_overrides[get_rag_service] = lambda: service
     try:
-        response = client.post("/v1/query", json={"question": "anything"})
+        response = client.post(
+            "/v1/query", json={"question": "anything"}, headers=TENANT_A_HEADERS
+        )
     finally:
         app.dependency_overrides.pop(get_rag_service)
     assert response.status_code == 503
@@ -76,7 +81,11 @@ def test_control_characters_stripped_before_processing() -> None:
     service, bedrock_client = make_service()
     app.dependency_overrides[get_rag_service] = lambda: service
     try:
-        response = client.post("/v1/query", json={"question": "what is\x00 the policy\x1b?"})
+        response = client.post(
+            "/v1/query",
+            json={"question": "what is\x00 the policy\x1b?"},
+            headers=TENANT_A_HEADERS,
+        )
     finally:
         app.dependency_overrides.pop(get_rag_service)
     assert response.status_code == 200

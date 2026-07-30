@@ -1,31 +1,38 @@
-"""pgvector-backed retrieval.
+"""pgvector-backed retrieval with tenant isolation.
 
-Cosine similarity search over document chunks. Connections use the
-configured DATABASE_URL (Secrets Manager in production). Vectors are
-passed as parameterized values and cast server-side - no SQL built from
-user input.
+Chunks carry tenant_id, document_id, classification, allowed_roles and
+source. Authorization uses two complementary controls: classification is the
+coarse sensitivity tier a role may read, and allowed_roles is an optional
+per-document ACL that narrows access further (empty = governed by
+classification alone). A caller must satisfy both.
+
+Schema creation and role provisioning live in app/rag/schema.py and run under
+an administrative connection; this module only ever uses the runtime role,
+which is provisioned NOSUPERUSER NOBYPASSRLS so row-level security applies to
+it.
+
+Two independent layers enforce isolation (ADR 0002):
+
+1. Application layer - every query filters on tenant_id and the caller's
+   allowed classifications inside the SQL WHERE clause, so unauthorized
+   chunks are never fetched into application memory.
+2. Database layer - PostgreSQL row-level security, FORCEd so it applies to
+   the table owner, with a runtime role provisioned NOBYPASSRLS. Each
+   connection sets `app.tenant_id` via
+   set_config(); when it is unset the policy matches nothing, so a coding
+   mistake fails closed rather than leaking rows.
+
+Vectors and identifiers are always passed as query parameters - no SQL is
+built from caller-controlled strings.
 """
 from dataclasses import dataclass
 from typing import Any
 
 import psycopg
 
+from app.auth.permissions import Classification
+from app.auth.tenancy import TenantContext
 from app.core.config import get_settings
-
-SCHEMA_SQL = """
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE TABLE IF NOT EXISTS document_chunks (
-    id BIGSERIAL PRIMARY KEY,
-    source TEXT NOT NULL,
-    chunk_index INT NOT NULL,
-    content TEXT NOT NULL,
-    embedding vector(%(dims)s) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (source, chunk_index)
-);
-CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx
-    ON document_chunks USING hnsw (embedding vector_cosine_ops);
-"""
 
 
 @dataclass(frozen=True)
@@ -34,6 +41,8 @@ class RetrievedChunk:
     chunk_index: int
     content: str
     score: float
+    document_id: str = ""
+    tenant_id: str = ""
 
 
 def _vector_literal(embedding: list[float]) -> str:
@@ -49,42 +58,84 @@ class VectorStore:
     def _connect(self) -> psycopg.Connection[Any]:
         return psycopg.connect(self._conninfo)
 
-    def initialize(self) -> None:
-        with self._connect() as conn, conn.cursor() as cur:
-            cur.execute(
-                SCHEMA_SQL.replace("%(dims)s", str(self._settings.embedding_dimensions))
-            )
+    def _connect_as(self, tenant_id: str) -> psycopg.Connection[Any]:
+        """Open a connection scoped to a tenant for the current transaction."""
+        conn = self._connect()
+        with conn.cursor() as cur:
+            cur.execute("SELECT set_config('app.tenant_id', %s, true)", (tenant_id,))
+        return conn
 
     def upsert_chunks(
-        self, source: str, chunks: list[tuple[int, str, list[float]]]
+        self,
+        tenant_id: str,
+        source: str,
+        classification: Classification,
+        chunks: list[tuple[int, str, list[float]]],
+        document_id: str | None = None,
+        allowed_roles: list[str] | None = None,
     ) -> int:
-        with self._connect() as conn, conn.cursor() as cur:
-            cur.execute("DELETE FROM document_chunks WHERE source = %s", (source,))
+        """Replace a document's chunks. allowed_roles=[] means classification governs."""
+        doc_id = document_id or source
+        roles = allowed_roles or []
+        with self._connect_as(tenant_id) as conn, conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM document_chunks WHERE tenant_id = %s AND document_id = %s",
+                (tenant_id, doc_id),
+            )
             for index, content, embedding in chunks:
                 cur.execute(
-                    "INSERT INTO document_chunks (source, chunk_index, content, embedding) "
-                    "VALUES (%s, %s, %s, %s::vector)",
-                    (source, index, content, _vector_literal(embedding)),
+                    "INSERT INTO document_chunks "
+                    "(tenant_id, document_id, source, chunk_index, content, "
+                    "classification, allowed_roles, embedding) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s::vector)",
+                    (
+                        tenant_id,
+                        doc_id,
+                        source,
+                        index,
+                        content,
+                        classification.value,
+                        roles,
+                        _vector_literal(embedding),
+                    ),
                 )
         return len(chunks)
 
     def search(
-        self, embedding: list[float], top_k: int | None = None, min_score: float | None = None
+        self,
+        embedding: list[float],
+        context: TenantContext,
+        top_k: int | None = None,
+        min_score: float | None = None,
     ) -> list[RetrievedChunk]:
+        """Return chunks for this tenant that the caller's role may read."""
         k = top_k or self._settings.retrieval_top_k
         threshold = min_score if min_score is not None else self._settings.retrieval_min_score
-        with self._connect() as conn, conn.cursor() as cur:
+        classifications = sorted(c.value for c in context.allowed_classifications)
+        if not classifications:
+            return []
+        vector = _vector_literal(embedding)
+        with self._connect_as(context.tenant_id) as conn, conn.cursor() as cur:
             cur.execute(
-                "SELECT source, chunk_index, content, "
+                "SELECT source, chunk_index, content, document_id, tenant_id, "
                 "1 - (embedding <=> %s::vector) AS score "
                 "FROM document_chunks "
+                "WHERE tenant_id = %s AND classification = ANY(%s) "
+                "AND (cardinality(allowed_roles) = 0 OR %s = ANY(allowed_roles)) "
                 "ORDER BY embedding <=> %s::vector "
                 "LIMIT %s",
-                (_vector_literal(embedding), _vector_literal(embedding), k),
+                (vector, context.tenant_id, classifications, context.role.value, vector, k),
             )
             rows = cur.fetchall()
         return [
-            RetrievedChunk(source=r[0], chunk_index=r[1], content=r[2], score=float(r[3]))
+            RetrievedChunk(
+                source=r[0],
+                chunk_index=r[1],
+                content=r[2],
+                document_id=r[3],
+                tenant_id=r[4],
+                score=float(r[5]),
+            )
             for r in rows
-            if float(r[3]) >= threshold
+            if float(r[5]) >= threshold
         ]

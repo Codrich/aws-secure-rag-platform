@@ -24,13 +24,27 @@ class Settings(BaseSettings):
     max_output_tokens: int = 1024
 
     # Vector store (local dev defaults; production values come from Secrets Manager)
-    database_url: str = "postgresql://rag:rag@localhost:5432/rag"
+    # Runtime role: NOSUPERUSER NOBYPASSRLS so row-level security applies to it.
+    database_url: str = "postgresql://rag_app:rag_app@localhost:5432/rag"
+    # Administrative role: DDL, policy and role provisioning only. Never used at runtime.
+    admin_database_url: str = "postgresql://rag:rag@localhost:5432/rag"
+    app_db_role: str = "rag_app"
+    # Dev-only default; overridden from Secrets Manager in AWS.
+    app_db_password: str = "rag_app"  # noqa: S105 - local development placeholder
     retrieval_top_k: int = 5
     retrieval_min_score: float = 0.35
 
     # Chunking
     chunk_max_chars: int = 1200
     chunk_overlap_chars: int = 150
+
+    # Tenancy (dev resolver only; replaced by verified Cognito claims in M4)
+    tenant_allowlist: str = "tenant-a,tenant-b"
+    default_tenant_role: str = "reader"
+
+    @property
+    def tenant_allowlist_values(self) -> frozenset[str]:
+        return frozenset(t.strip() for t in self.tenant_allowlist.split(",") if t.strip())
 
 
 @lru_cache

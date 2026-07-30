@@ -105,7 +105,7 @@ synthetic-data/ Synthetic document corpus (no real data)
 | Milestone | Deliverable | Status |
 |---|---|---|
 | 1 | Make it work: restructure, packaging, lint/type/test green, one-command local run, cited RAG flow | Done (this branch) |
-| 2 | Make it secure: tenant-aware retrieval, document classification, authorization + misuse-case tests | Partial: fail-closed + misuse tests done; tenancy next |
+| 2 | Make it secure: tenant-aware retrieval, document classification, authorization + misuse-case tests | Done (identity resolver is a dev header shim until Cognito lands in M4) |
 | 3 | Make AI behavior measurable: golden dataset, offline eval gates blocking CI, workflow scorecard | Done (offline); model-graded gates at M5 |
 | 4 | Make the release trustworthy: Trivy, Gitleaks, SBOM, Cosign, provenance, evidence bundle | Partial: Checkov + secret scan in CI |
 | 5 | Prove AWS delivery: Terraform foundation, ephemeral ECS deploy, smoke tests, teardown, cost report | Planned |
@@ -118,7 +118,8 @@ Out of scope by decision: Backstage, Kubernetes variant, multi-cloud, SaaS contr
 
 - All data is synthetic; compliance mappings are alignment exercises, not certifications.
 - Offline evaluations are deterministic behavioral checks, not independent model-graded scores (those arrive with the ephemeral deployment).
-- Tenant isolation is designed (ADR 0002) but not yet implemented; retrieval is currently single-tenant.
+- Tenant isolation is enforced at the retrieval query (tenant, classification and per-document role ACL) and independently by PostgreSQL row-level security. Caller identity currently comes from validated request headers; verified Cognito JWT claims replace that resolver in Milestone 4 without changing call sites.
+- Row-level security is verified only against a real PostgreSQL instance (CI `integration-tests` job, or locally with `TEST_ADMIN_DATABASE_URL` and `TEST_DATABASE_URL` set); those tests skip otherwise. Row security depends on the runtime role being `NOSUPERUSER NOBYPASSRLS` — see FINDINGS.md F-001 for why that is asserted rather than assumed.
 - pgvector is chosen for cost and reproducibility, not maximum-scale search.
 - No cloud environment is kept running; AWS deployments are ephemeral by design.
 
@@ -128,6 +129,7 @@ Out of scope by decision: Backstage, Kubernetes variant, multi-cloud, SaaS contr
 - [NIST AI RMF mapping](docs/governance/NIST_AI_RMF_MAPPING.md)
 - [OWASP LLM Top 10 mapping](docs/governance/OWASP_LLM_TOP_10_MAPPING.md)
 - [AI incident response runbook](docs/runbooks/AI_INCIDENT_RESPONSE_RUNBOOK.md)
+- [Security findings and remediations](docs/security/FINDINGS.md)
 - [Failure-mode contract](docs/security/FAILURE_MODES.md)
 - [Control traceability matrix](docs/security/CONTROL_TRACEABILITY.md)
 - [Architecture decision records](docs/adr/)
