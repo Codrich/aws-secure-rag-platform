@@ -25,6 +25,16 @@ itself. Two independent layers enforce this:
    when unset, so the policy matches no rows. A connection that forgets to
    set the tenant sees nothing rather than everything.
 
+   **The runtime role must be `NOSUPERUSER NOBYPASSRLS`.** PostgreSQL exempts
+   superusers and `BYPASSRLS` roles from row security unconditionally, and
+   `FORCE` removes only the table-owner exemption. Schema, policy and role
+   provisioning therefore run under a separate administrative connection
+   (`app/rag/schema.py`, `ADMIN_DATABASE_URL`) while the application uses a
+   restricted runtime role granted DML only. `assert_no_rls_bypass()` fails
+   initialization if that role can bypass the policy. This is not a detail:
+   getting it wrong disables the layer silently while every
+   application-layer test still passes (docs/security/FINDINGS.md, F-001).
+
 Tenant identity is resolved server-side (`app/auth/tenancy.py`) and is never
 read from the request body; request models set `extra="forbid"` so a
 smuggled `tenant_id` is rejected with 422 rather than silently ignored.

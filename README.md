@@ -119,7 +119,7 @@ Out of scope by decision: Backstage, Kubernetes variant, multi-cloud, SaaS contr
 - All data is synthetic; compliance mappings are alignment exercises, not certifications.
 - Offline evaluations are deterministic behavioral checks, not independent model-graded scores (those arrive with the ephemeral deployment).
 - Tenant isolation is enforced at the retrieval query (tenant, classification and per-document role ACL) and independently by PostgreSQL row-level security. Caller identity currently comes from validated request headers; verified Cognito JWT claims replace that resolver in Milestone 4 without changing call sites.
-- Row-level security is verified only in the CI `integration-tests` job, which runs a real pgvector container; those tests skip on machines without `TEST_DATABASE_URL`.
+- Row-level security is verified only against a real PostgreSQL instance (CI `integration-tests` job, or locally with `TEST_ADMIN_DATABASE_URL` and `TEST_DATABASE_URL` set); those tests skip otherwise. Row security depends on the runtime role being `NOSUPERUSER NOBYPASSRLS` — see FINDINGS.md F-001 for why that is asserted rather than assumed.
 - pgvector is chosen for cost and reproducibility, not maximum-scale search.
 - No cloud environment is kept running; AWS deployments are ephemeral by design.
 
@@ -129,6 +129,7 @@ Out of scope by decision: Backstage, Kubernetes variant, multi-cloud, SaaS contr
 - [NIST AI RMF mapping](docs/governance/NIST_AI_RMF_MAPPING.md)
 - [OWASP LLM Top 10 mapping](docs/governance/OWASP_LLM_TOP_10_MAPPING.md)
 - [AI incident response runbook](docs/runbooks/AI_INCIDENT_RESPONSE_RUNBOOK.md)
+- [Security findings and remediations](docs/security/FINDINGS.md)
 - [Failure-mode contract](docs/security/FAILURE_MODES.md)
 - [Control traceability matrix](docs/security/CONTROL_TRACEABILITY.md)
 - [Architecture decision records](docs/adr/)

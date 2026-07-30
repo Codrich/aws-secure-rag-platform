@@ -24,7 +24,13 @@ class Settings(BaseSettings):
     max_output_tokens: int = 1024
 
     # Vector store (local dev defaults; production values come from Secrets Manager)
-    database_url: str = "postgresql://rag:rag@localhost:5432/rag"
+    # Runtime role: NOSUPERUSER NOBYPASSRLS so row-level security applies to it.
+    database_url: str = "postgresql://rag_app:rag_app@localhost:5432/rag"
+    # Administrative role: DDL, policy and role provisioning only. Never used at runtime.
+    admin_database_url: str = "postgresql://rag:rag@localhost:5432/rag"
+    app_db_role: str = "rag_app"
+    # Dev-only default; overridden from Secrets Manager in AWS.
+    app_db_password: str = "rag_app"  # noqa: S105 - local development placeholder
     retrieval_top_k: int = 5
     retrieval_min_score: float = 0.35
 

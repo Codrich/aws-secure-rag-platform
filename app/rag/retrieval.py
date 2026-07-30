@@ -6,13 +6,19 @@ coarse sensitivity tier a role may read, and allowed_roles is an optional
 per-document ACL that narrows access further (empty = governed by
 classification alone). A caller must satisfy both.
 
+Schema creation and role provisioning live in app/rag/schema.py and run under
+an administrative connection; this module only ever uses the runtime role,
+which is provisioned NOSUPERUSER NOBYPASSRLS so row-level security applies to
+it.
+
 Two independent layers enforce isolation (ADR 0002):
 
 1. Application layer - every query filters on tenant_id and the caller's
    allowed classifications inside the SQL WHERE clause, so unauthorized
    chunks are never fetched into application memory.
 2. Database layer - PostgreSQL row-level security, FORCEd so it applies to
-   the table owner too. Each connection sets `app.tenant_id` via
+   the table owner, with a runtime role provisioned NOBYPASSRLS. Each
+   connection sets `app.tenant_id` via
    set_config(); when it is unset the policy matches nothing, so a coding
    mistake fails closed rather than leaking rows.
 
@@ -27,50 +33,6 @@ import psycopg
 from app.auth.permissions import Classification
 from app.auth.tenancy import TenantContext
 from app.core.config import get_settings
-
-SCHEMA_SQL = """
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE TABLE IF NOT EXISTS document_chunks (
-    id BIGSERIAL PRIMARY KEY,
-    source TEXT NOT NULL,
-    chunk_index INT NOT NULL,
-    content TEXT NOT NULL,
-    embedding vector(%(dims)s) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (source, chunk_index)
-);
-ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS tenant_id TEXT;
-ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS document_id TEXT;
-ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS classification TEXT;
-ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS allowed_roles TEXT[] DEFAULT '{}';
-UPDATE document_chunks SET tenant_id = 'unassigned' WHERE tenant_id IS NULL;
-UPDATE document_chunks SET classification = 'restricted' WHERE classification IS NULL;
-UPDATE document_chunks SET document_id = source WHERE document_id IS NULL;
-UPDATE document_chunks SET allowed_roles = '{}' WHERE allowed_roles IS NULL;
-ALTER TABLE document_chunks ALTER COLUMN tenant_id SET NOT NULL;
-ALTER TABLE document_chunks ALTER COLUMN classification SET NOT NULL;
-ALTER TABLE document_chunks ALTER COLUMN document_id SET NOT NULL;
-ALTER TABLE document_chunks ALTER COLUMN allowed_roles SET NOT NULL;
-
-ALTER TABLE document_chunks DROP CONSTRAINT IF EXISTS document_chunks_source_chunk_index_key;
-CREATE UNIQUE INDEX IF NOT EXISTS document_chunks_tenant_source_idx
-    ON document_chunks (tenant_id, source, chunk_index);
-CREATE INDEX IF NOT EXISTS document_chunks_tenant_class_idx
-    ON document_chunks (tenant_id, classification);
-CREATE INDEX IF NOT EXISTS document_chunks_tenant_document_idx
-    ON document_chunks (tenant_id, document_id);
-CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx
-    ON document_chunks USING hnsw (embedding vector_cosine_ops);
-
--- Row-level security: the database enforces isolation independently of the
--- application. FORCE makes the policy apply to the table owner as well.
-ALTER TABLE document_chunks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE document_chunks FORCE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS tenant_isolation ON document_chunks;
-CREATE POLICY tenant_isolation ON document_chunks
-    USING (tenant_id = current_setting('app.tenant_id', true))
-    WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
-"""
 
 
 @dataclass(frozen=True)
@@ -102,10 +64,6 @@ class VectorStore:
         with conn.cursor() as cur:
             cur.execute("SELECT set_config('app.tenant_id', %s, true)", (tenant_id,))
         return conn
-
-    def initialize(self) -> None:
-        with self._connect() as conn, conn.cursor() as cur:
-            cur.execute(SCHEMA_SQL.replace("%(dims)s", str(self._settings.embedding_dimensions)))
 
     def upsert_chunks(
         self,
