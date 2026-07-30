@@ -5,6 +5,7 @@ be asserted by the caller, and reaches the retrieval query. Database-level
 enforcement (row-level security) is verified separately against a real
 PostgreSQL instance in app/tests/test_rls_integration.py.
 """
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -238,6 +239,7 @@ def test_prompt_context_contains_only_authorized_chunks() -> None:
             allowed_classifications=allowed_classifications(Role.READER),
         ),
     )
-    sent_prompt = bedrock._client.converse.call_args.kwargs["messages"][0]["content"][0]["text"]
+    mock_client = cast(MagicMock, bedrock._client)
+    sent_prompt = mock_client.converse.call_args.kwargs["messages"][0]["content"][0]["text"]
     assert "TENANT-A-ONLY-MARKER" in sent_prompt
     assert sent_prompt == build_user_prompt("what is the policy?", [authorized])
