@@ -43,5 +43,9 @@ def test_no_context_means_no_bedrock_invocation() -> None:
     embeddings.embed.return_value = [0.0]
     store = MagicMock()
     store.search.return_value = []
-    RagService(bedrock=bedrock, embeddings=embeddings, store=store).query("anything", context=CONTEXT)
+    RagService(
+        bedrock=bedrock,
+        embeddings=embeddings,
+        store=store,
+    ).query("anything", context=CONTEXT)
     bedrock.invoke.assert_not_called()
