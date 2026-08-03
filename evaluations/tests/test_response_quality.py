@@ -5,10 +5,10 @@ Phase 5 adds model-graded relevance and completeness scoring.
 """
 from unittest.mock import MagicMock
 
-from app.clients.bedrock import BedrockService
-from app.rag.retrieval import RetrievedChunk
 from app.auth.permissions import Role, allowed_classifications
 from app.auth.tenancy import TenantContext
+from app.clients.bedrock import BedrockService
+from app.rag.retrieval import RetrievedChunk
 from app.rag.service import RagService
 
 
