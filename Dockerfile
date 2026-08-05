@@ -1,15 +1,27 @@
-FROM python:3.11-slim AS base
+FROM python:3.11-slim-bookworm AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.1 /uv /uvx /bin/
-
-RUN groupadd -r app && useradd -r -g app app
 
 WORKDIR /srv
 
 COPY pyproject.toml uv.lock ./
 COPY app/ ./app/
 
-RUN uv sync --locked --no-dev --no-editable
+RUN uv sync --locked --no-dev --no-editable \
+    && rm -rf /root/.cache/uv
+
+FROM python:3.11-slim-bookworm AS runtime
+
+RUN groupadd -r app \
+    && useradd -r -g app app \
+    && rm -rf /usr/local/lib/python3.11/site-packages/pip* \
+              /usr/local/lib/python3.11/site-packages/setuptools* \
+              /usr/local/lib/python3.11/site-packages/wheel*
+
+WORKDIR /srv
+
+COPY --from=builder /srv/.venv /srv/.venv
+COPY app/ ./app/
 
 ENV PATH="/srv/.venv/bin:$PATH"
 

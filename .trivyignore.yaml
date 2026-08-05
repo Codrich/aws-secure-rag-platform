@@ -1,0 +1,56 @@
+vulnerabilities:
+  - id: CVE-2026-53615
+    expired_at: 2026-09-05
+    statement: No Debian 12 fix is currently available; temporary acceptance for the non-root runtime image. Reassess within 30 days.
+
+  - id: CVE-2026-41992
+    expired_at: 2026-09-05
+    statement: Debian marks remediation as deferred; temporary acceptance pending a patched base image.
+
+  - id: CVE-2026-54369
+    expired_at: 2026-09-05
+    statement: No Debian 12 fixed package is currently available; temporary acceptance pending vendor remediation.
+
+  - id: CVE-2025-69720
+    expired_at: 2026-09-05
+    statement: No Debian 12 fixed package is currently available; temporary acceptance pending vendor remediation.
+
+  - id: CVE-2025-7458
+    expired_at: 2026-09-05
+    statement: No Debian 12 fixed package is currently available; temporary acceptance pending vendor remediation.
+
+  - id: CVE-2026-13221
+    expired_at: 2026-09-05
+    statement: No Debian 12 fixed package is currently available; temporary acceptance pending vendor remediation.
+
+  - id: CVE-2026-42496
+    expired_at: 2026-09-05
+    statement: Debian marks remediation as deferred; temporary acceptance pending a patched base image.
+
+  - id: CVE-2026-57433
+    expired_at: 2026-09-05
+    statement: No Debian 12 fixed package is currently available; temporary acceptance pending vendor remediation.
+
+  - id: CVE-2026-8376
+    expired_at: 2026-09-05
+    statement: No Debian 12 fixed package is currently available; temporary acceptance pending vendor remediation.
+
+  - id: CVE-2026-42497
+    expired_at: 2026-09-05
+    statement: Debian marks remediation as deferred; temporary acceptance pending a patched base image.
+
+  - id: CVE-2026-48962
+    expired_at: 2026-09-05
+    statement: No Debian 12 fixed package is currently available; temporary acceptance pending vendor remediation.
+
+  - id: CVE-2026-57432
+    expired_at: 2026-09-05
+    statement: No Debian 12 fixed package is currently available; temporary acceptance pending vendor remediation.
+
+  - id: CVE-2026-9538
+    expired_at: 2026-09-05
+    statement: Debian marks remediation as deferred; temporary acceptance pending a patched base image.
+
+  - id: CVE-2023-45853
+    expired_at: 2026-09-05
+    statement: Debian marks this finding as will-not-fix; temporary acceptance requires monthly reassessment.
