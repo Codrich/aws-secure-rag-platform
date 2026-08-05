@@ -107,8 +107,41 @@ jobs:
           ignore-unfixed: false
           trivyignores: .trivyignore.yaml
 
+  terraform-policy-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify compliant Terraform plan
+        run: |
+          docker run --rm \
+            -v "${PWD}:/project" \
+            -w /project \
+            openpolicyagent/conftest:v0.68.2@sha256:5fd81e332d7e4bc01daf3ef35371800a9a9720a30c0c37a78de0c5fbe4b6d622 \
+            test \
+            --policy policy/terraform \
+            policy/fixtures/terraform-plan-compliant.json
+
+      - name: Verify noncompliant Terraform plan is rejected
+        run: |
+          if docker run --rm \
+            -v "${PWD}:/project" \
+            -w /project \
+            openpolicyagent/conftest:v0.68.2@sha256:5fd81e332d7e4bc01daf3ef35371800a9a9720a30c0c37a78de0c5fbe4b6d622 \
+            test \
+            --policy policy/terraform \
+            policy/fixtures/terraform-plan-noncompliant.json
+          then
+            echo "ERROR: Noncompliant Terraform plan unexpectedly passed."
+            exit 1
+          else
+            echo "Expected result: noncompliant Terraform plan was rejected."
+          fi
+
   # Milestone 4 remaining:
-  # Conftest/Rego, CycloneDX SBOMs,
+  # CycloneDX SBOMs,
   # OCI provenance, and evidence summary.
   #
   # Milestone 5:

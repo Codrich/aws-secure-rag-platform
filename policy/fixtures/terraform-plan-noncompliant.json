@@ -1,0 +1,59 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.0",
+  "resource_changes": [
+    {
+      "address": "aws_ecs_service.insecure",
+      "mode": "managed",
+      "type": "aws_ecs_service",
+      "name": "insecure",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "network_configuration": [
+            {
+              "assign_public_ip": true,
+              "security_groups": ["sg-public"],
+              "subnets": ["subnet-public-a"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "aws_db_instance.insecure",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "insecure",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "publicly_accessible": true
+        }
+      }
+    },
+    {
+      "address": "aws_security_group.insecure",
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "insecure",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "ingress": [
+            {
+              "from_port": 0,
+              "to_port": 65535,
+              "protocol": "-1",
+              "cidr_blocks": ["0.0.0.0/0"],
+              "ipv6_cidr_blocks": ["::/0"]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
