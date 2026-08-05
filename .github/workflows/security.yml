@@ -28,7 +28,7 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Check out full Git history
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
@@ -38,9 +38,57 @@ jobs:
         with:
           extra_args: --results=verified,unknown
 
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.12.1"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Export locked production dependencies
+        run: >
+          uv export
+          --locked
+          --no-dev
+          --no-emit-local
+          --format requirements.txt
+          --output-file requirements-audit.txt
+
+      - name: Audit Python dependencies
+        run: >
+          uvx --from pip-audit==2.10.0
+          pip-audit
+          --require-hashes
+          --requirement requirements-audit.txt
+          --progress-spinner off
+
+  gitleaks-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full Git history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan with Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # Milestone 4 remaining:
-  # pip-audit, Trivy HIGH/CRITICAL gate, Gitleaks, Conftest/Rego,
-  # CycloneDX SBOMs, OCI provenance, and evidence summary.
+  # Trivy HIGH/CRITICAL gate, Conftest/Rego, CycloneDX SBOMs,
+  # OCI provenance, and evidence summary.
   #
   # Milestone 5:
   # Cosign signing, ECR attachment/verification, live Bedrock,
