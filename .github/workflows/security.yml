@@ -105,6 +105,7 @@ jobs:
           severity: HIGH,CRITICAL
           vuln-type: os,library
           ignore-unfixed: false
+          trivyignores: .trivyignore.yaml
 
   # Milestone 4 remaining:
   # Conftest/Rego, CycloneDX SBOMs,
