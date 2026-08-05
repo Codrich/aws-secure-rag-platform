@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 6 * * 1"  # weekly baseline scan
+    - cron: "0 6 * * 1" # weekly baseline scan
 
 permissions:
   contents: read
@@ -14,9 +14,11 @@ jobs:
   iac-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: IaC scan (Checkov)
-        uses: bridgecrewio/checkov-action@master
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: IaC scan with Checkov
+        uses: bridgecrewio/checkov-action@9b70310bcd306d11740313070b940167d6b23085 # master pinned 2026-08-04
         with:
           directory: infrastructure
           config_file: checkov.yml
@@ -26,11 +28,20 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Secret scan (TruffleHog)
-        uses: trufflesecurity/trufflehog@main
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan with TruffleHog
+        uses: trufflesecurity/trufflehog@24c98ca20e421a6807518f79c5cdd063400774f2 # main pinned 2026-08-04
         with:
           extra_args: --results=verified,unknown
 
-  # Phase 5: prompt-injection suite (evaluations/security) as a blocking gate
-  # Phase 6: docker build -> Trivy scan -> SBOM (CycloneDX) -> Cosign sign -> ECR push
+  # Milestone 4 remaining:
+  # pip-audit, Trivy HIGH/CRITICAL gate, Gitleaks, Conftest/Rego,
+  # CycloneDX SBOMs, OCI provenance, and evidence summary.
+  #
+  # Milestone 5:
+  # Cosign signing, ECR attachment/verification, live Bedrock,
+  # latency, and model-graded evaluations.
