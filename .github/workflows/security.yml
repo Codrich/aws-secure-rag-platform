@@ -140,10 +140,126 @@ jobs:
             echo "Expected result: noncompliant Terraform plan was rejected."
           fi
 
-  # Milestone 4 remaining:
-  # CycloneDX SBOMs,
-  # OCI provenance, and evidence summary.
-  #
+  sbom-and-build-evidence:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.1"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Export locked production dependencies
+        run: >
+          uv export
+          --locked
+          --no-dev
+          --no-emit-local
+          --format requirements.txt
+          --output-file requirements-audit.txt
+
+      - name: Generate Python CycloneDX SBOM
+        run: >
+          uvx --from cyclonedx-bom==4.1.2
+          cyclonedx-py
+          requirements
+          requirements-audit.txt
+          -o sbom-python.cdx.json
+
+      - name: Build locked container image
+        run: docker build --tag aws-secure-rag-platform:${{ github.sha }} .
+
+      - name: Generate container CycloneDX SBOM with Trivy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: aws-secure-rag-platform:${{ github.sha }}
+          format: cyclonedx
+          output: sbom-container.cdx.json
+
+      - name: Validate CycloneDX SBOMs
+        run: |
+          python - <<'PY'
+          import json
+          for path in ("sbom-python.cdx.json", "sbom-container.cdx.json"):
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              assert data.get("bomFormat") == "CycloneDX", f"Invalid format in {path}"
+              spec_version = data.get("specVersion")
+              components = data.get("components", [])
+              assert spec_version in ("1.4", "1.5", "1.6"), (
+                  f"Invalid specVersion in {path}"
+              )
+              assert len(components) > 0, f"No components found in {path}"
+              print(
+                  f"Validated {path}: CycloneDX {spec_version} "
+                  f"with {len(components)} components"
+              )
+          PY
+
+      - name: Archive image and preserve build evidence
+        run: |
+          mkdir -p artifacts
+          docker save aws-secure-rag-platform:${{ github.sha }} \
+            | gzip > artifacts/aws-secure-rag-platform-${{ github.sha }}.tar.gz
+          cp sbom-python.cdx.json sbom-container.cdx.json artifacts/
+
+          cd artifacts
+
+          sha256sum \
+            aws-secure-rag-platform-${{ github.sha }}.tar.gz \
+            > aws-secure-rag-platform-${{ github.sha }}.tar.gz.sha256
+          sha256sum \
+            sbom-python.cdx.json \
+            sbom-container.cdx.json \
+            > sboms.sha256
+
+          cat <<EOF > build-metadata.json
+          {
+            "schemaVersion": "1.0",
+            "git": {
+              "commit": "${{ github.sha }}",
+              "ref": "${{ github.ref }}",
+              "repository": "${{ github.repository }}"
+            },
+            "build": {
+              "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+              "runner": {
+                "os": "${{ runner.os }}",
+                "arch": "${{ runner.arch }}"
+              },
+              "imageTag": "aws-secure-rag-platform:${{ github.sha }}"
+            },
+            "artifacts": {
+              "imageArchive": "aws-secure-rag-platform-${{ github.sha }}.tar.gz",
+              "pythonSbom": "sbom-python.cdx.json",
+              "containerSbom": "sbom-container.cdx.json"
+            }
+          }
+          EOF
+
+      - name: Verify generated checksums
+        run: |
+          cd artifacts
+          sha256sum -c aws-secure-rag-platform-${{ github.sha }}.tar.gz.sha256
+          sha256sum -c sboms.sha256
+
+      - name: Publish SBOM and build evidence artifacts
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb99baeddf # v4.6.1
+        with:
+          name: m4-supply-chain-artifacts-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+
   # Milestone 5:
   # Cosign signing, ECR attachment/verification, live Bedrock,
   # latency, and model-graded evaluations.
