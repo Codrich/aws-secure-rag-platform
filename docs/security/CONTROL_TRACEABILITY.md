@@ -23,6 +23,11 @@ planned controls live in the threat model and FAILURE_MODES.md, not here.
 | Hidden control characters | Input sanitization at API boundary | `app/core/security.py`, `app/api/routes/query.py` | `app/tests/test_security.py`, `app/tests/test_failure_modes.py` | CI run |
 | Ungrounded fallback on store outage | Fail-closed 503; model never called | `app/api/routes/query.py` | `app/tests/test_failure_modes.py` | CI run |
 | SQL injection via vectors | Parameterized queries; server-side vector cast | `app/rag/retrieval.py` | code review; no string-built SQL | repo |
-| Committed secrets | TruffleHog scan on every push/PR | `.github/workflows/security.yml` | workflow run | Actions log |
+| Committed secrets | TruffleHog and Gitleaks scans on every push/PR | `.github/workflows/security.yml` | workflow run | Actions log |
 | IaC misconfiguration | Checkov scan, `soft_fail: false` | `.github/workflows/security.yml` | workflow run | Actions log |
+| Dependency vulnerabilities | `pip-audit --require-hashes` against locked `uv.lock` | `.github/workflows/security.yml` | workflow run | Actions log |
+| Container vulnerabilities | Blocking Trivy scan (`HIGH,CRITICAL`) with expiring allowlist | `.github/workflows/security.yml`, `.trivyignore.yaml` | workflow run | Actions log |
+| Insecure Terraform declarations | Conftest / OPA policy-as-code gate | `policy/terraform/security.rego`, `.github/workflows/security.yml` | `policy/fixtures/` compliance tests | Actions log |
+| Supply chain opacity | CycloneDX SBOMs for Python and container image | `.github/workflows/security.yml` | automated SBOM validation | GitHub Actions artifact |
+| Untracked build artifacts | Docker image archive, SHA-256 digests, and build metadata | `.github/workflows/security.yml` | checksum verification | GitHub Actions artifact |
 | Prompt/response data leakage via logs | Metadata-only structured logging by default | `app/core/logging.py` | `LOG_FULL_CONTENT` gate, code review | repo |

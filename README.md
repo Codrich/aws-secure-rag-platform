@@ -107,7 +107,7 @@ synthetic-data/ Synthetic document corpus (no real data)
 | 1 | Make it work: restructure, packaging, lint/type/test green, one-command local run, cited RAG flow | Done (this branch) |
 | 2 | Make it secure: tenant-aware retrieval, document classification, authorization + misuse-case tests | Done (identity resolver is a dev header shim until Cognito lands in M4) |
 | 3 | Make AI behavior measurable: golden dataset, offline eval gates blocking CI, workflow scorecard | Done (offline); model-graded gates at M5 |
-| 4 | Make the release trustworthy: Trivy, Gitleaks, SBOM, Cosign, provenance, evidence bundle | Partial: Checkov + secret scan in CI |
+| 4 | Make the release trustworthy: Checkov, TruffleHog, Gitleaks, pip-audit, Trivy container gate, Conftest Terraform policies, CycloneDX SBOMs, OCI provenance, evidence bundle | Done (see [Milestone 4 evidence](docs/security/MILESTONE_4_EVIDENCE.md)); Cosign signing at M5 |
 | 5 | Prove AWS delivery: Terraform foundation, ephemeral ECS deploy, smoke tests, teardown, cost report | Planned |
 | 6 | Operational depth: SQS ingestion with DLQ, OpenTelemetry, red-team findings, demo recording | Planned |
 
@@ -132,6 +132,7 @@ Out of scope by decision: Backstage, Kubernetes variant, multi-cloud, SaaS contr
 - [Security findings and remediations](docs/security/FINDINGS.md)
 - [Failure-mode contract](docs/security/FAILURE_MODES.md)
 - [Control traceability matrix](docs/security/CONTROL_TRACEABILITY.md)
+- [Milestone 4 security evidence](docs/security/MILESTONE_4_EVIDENCE.md)
 - [Architecture decision records](docs/adr/)
 - [Security policy](SECURITY.md)
 

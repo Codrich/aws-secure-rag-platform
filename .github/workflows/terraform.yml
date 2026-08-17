@@ -5,12 +5,14 @@ on:
     paths:
       - "infrastructure/**"
       - "policies/**"
+      - "policy/**"
   push:
     branches:
       - main
     paths:
       - "infrastructure/**"
       - "policies/**"
+      - "policy/**"
 
 permissions:
   contents: read
